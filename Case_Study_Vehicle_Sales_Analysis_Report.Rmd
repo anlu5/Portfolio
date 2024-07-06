@@ -1,0 +1,689 @@
+---
+title: "Case study: Vehicle Sales Analysis Report"
+author: "Anthony Lu"
+date: "7/5/24"
+output:
+  html_document:
+    css: styles.css
+    toc: true
+    toc_depth: 3
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+This report provides an in-depth analysis of vehicle sales data for a California car dealership company. The primary objectives are to identify top-performing vehicle makes, types, and models, and to extract insights that can inform and enhance future vehicle inventory and marketing strategies.
+
+The objective of this analysis is to explore vehicle sales data to understand the characteristics and trends of the market. By identifying the most popular vehicle makes, types, and models, we aim to develop targeted marketing strategies and inform future vehicle inventory.
+
+## Data Description
+
+The source of this [dataset](https://www.kaggle.com/datasets/syedanwarafridi/vehicle-sales-data/data) was accessed from a public third-party source from Kaggle by a user, Syed Anwar. This dataset includes 558,837 records that have 16 variables, or 558,837 rows and 16 columns.
+
+Each record defined through:
+
+-   year - year of make
+-   make - manufacturer of vehicle
+-   model - model of vehicle
+-   trim - vehicle model version
+-   body - type of vehicle
+-   transmission - type of engine
+-   vin - vehicle identification number
+-   state - state within the United States
+-   condition - condition of the vehicle
+-   odometer - vehicle mileage
+-   color - exterior color
+-   interior - interior color
+-   seller - the specific dealership
+-   mmr - Manheim Market Report, leading wholesale value of vehicle
+-   sellingprice - actual price vehicle was sold
+-   saledate - date when sale happened
+
+### Licensing, privacy, security and accessiblity
+
+This dataset was released under [MIT](https://www.mit.edu/~amini/LICENSE.md) License. It provides permission (not limited) to use, copy, modify, merge, publish, and distribute.
+
+## Data Wrangling/Prep
+
+During this process I checked for duplicate and missing values, correcting data types, removing outliers, and ensuring uniqueness in each record.
+
+The tools I used to accomplish this task is through PostgreSQL through the DBMS DBeaver.
+
+### Processing process
+
+-   Backing up the initial data to archive as a raw data file, I began to do EDA. Before the processing during general exploring I noticed empty strings in the column make and null values from the condition column.
+
+-   Removed records that do not include California in the state column.
+
+``` sql
+delete from car_sales
+where state != 'ca'
+```
+
+-   Checked for duplicates and empty strings in the VIN column, identifying each physical vehicle.
+
+``` sql
+select
+    vin,
+    count(*)
+from car_sales
+group by vin
+order by count(*) desc
+```
+
+-   Multiple VIN counts indicates that the car was resold, no empty strings found.
+
+![Screenshot from DBeaver](vin_check.png)
+
+-   Removed empty strings in the make column and null values from the condition column.
+
+``` sql
+delete from car_sales
+where make = ''
+```
+
+``` sql
+delete from car_sales
+where condition is null
+```
+
+-   Created new columns to organize saledate into date format and time column and separated Year, Month, Day.
+
+``` sql
+alter table car_sales
+add column dateofsale date,
+add column timeofsalepst time,
+add column yearofsale varchar(50),
+add column monthofsale varchar(50),
+add column dayofweek varchar(50)
+```
+
+-   Two times zones were present (PDT) and (PST), so to keep a consistent format I converted to PDT times to PST time, while updating the columns that were created.
+
+``` sql
+update car_sales
+set
+    dateofsale = (
+        to_timestamp(substring(saledate , 5, 20), 'Mon DD YYYY HH24:MI:SS')
+    ),
+    timeofsalepst = (
+        case
+            when saledate like '%PDT%' then (to_timestamp(substring(saledate , 5, 20), 'Mon DD YYYY HH24:MI:SS') at time zone 'PST' )
+            when saledate like '%PST%' then (to_timestamp(substring(saledate , 5, 20), 'Mon DD YYYY HH24:MI:SS') at time zone 'PST' )
+        end
+    ),
+    yearofsale = extract(year from dateofsale),
+    monthofsale = substr(saledate, 5, 3),
+    dayofweek = substr(saledate, 1, 3)
+```
+
+-   I realized that I could change the character length of the month and day of week data type from varchar (50) to varchar(3) and varchar(4) for years.
+    -   The purpose is for better performance and storage efficiency practice.
+
+``` sql
+alter table car_sales
+alter column yearofsale type varchar(4)
+alter column monthofsale type varchar(3),
+alter column dayofweek type varchar(3)
+```
+
+Situation:
+
+-   Before exporting the final dataset, I wanted to make sure that it was sorted by earliest sale to oldest sale.
+
+-   Problem arose where instead of January being on the top, June was on top, so there was a problem with how the dates were sorted. To address the problem:
+
+    -   I added three columns: monos for month of sale, dayos for day of sale, and dayow for day of week.
+
+    ``` sql
+    alter table car_sales
+    add column monos int4,
+    add column dayos int4,
+    add column dayow int4
+    ```
+
+    -   Then updated the monos and dayos column using EXTRACT with the corresponding dates from the dateofsale.
+    -   Since there are no values to EXTRACT for dayofweek I had to map each weekday to a number from 1-7. Additionally to make it more efficient I checked the unique day of the week so that I don't have to map values to days of the week that did not make sales.
+
+``` sql
+select distinct dayofweek
+from car_sales
+```
+
+![Screenshot from DBeaver](unique_dow.png)
+
+-   Sales were made on weekdays, so I map the values 1-5 to each weekday.
+
+``` sql
+update car_sales
+set
+    monos = extract(month from dateofsale),
+    dayos = extract(day from dateofsale),
+    dayow = (
+        case
+            when dayofweek like 'Mon' then 1
+            when dayofweek like 'Tue' then 2
+            when dayofweek like 'Wed' then 3
+            when dayofweek like 'Thu' then 4
+            when dayofweek like 'Fri' then 5
+        end)
+```
+
+-   After finishing with the processing, the final table has **70,206 rows** and **24 columns**.
+-   I did a final verification to check that all rows should be from 2015 in California by inspecting that the unique years and states were indeed from 2015 and California.
+-   The dataset now contains all the critical information needed to start the analyzing process.
+
+### Exporting
+
+-   Sorted the dataset by earliest date before exporting.
+
+``` sql
+select *
+from car_sales
+order by yearofsale, monos, dayos
+```
+
+-   Used the export data feature from DBeaver naming the file 'car_sales_cleaned.csv'.
+
+### Processing Phase Reflection
+
+-   It is important to have some sort of value that can help index dates such that it can be sorted.
+-   So instead of using just strings to identify the dates I should have added 1-12 for months and 1-7 for days from the start.
+-   If I had teammates working on the same project I would ask them for their perspective to find any additional processing needed.
+
+## Analysis process
+
+-   Loaded packages needed for analysis.
+
+```{r load data, warning = FALSE, message=FALSE}
+library(readr)
+library(ggplot2)
+library(dplyr)
+library(RColorBrewer)
+library(stringr)
+library(tidyverse)
+```
+
+-   Viewed the dataset, there are 70,206 rows and 24 columns.
+
+```{r look at data}
+cars_df <- read.csv("car_sales_cleaned.csv")
+tibble(cars_df)
+```
+
+### Aggregating data
+
+-   Created a pivot data frame to summarize the vehicles by manufacturer make.
+
+```{r grouping car make}
+by_make_cars <- cars_df %>%
+  group_by(make) %>%
+  summarize(
+    total_sold = n(),
+    total_sales = sum(sellingprice),
+    avg_sell_price = total_sales / total_sold)
+tibble(by_make_cars)
+```
+
+-   Created a new data frame organized by the most sold make.
+
+```{r finding most sold makes}
+most_sold <- arrange(by_make_cars, desc(total_sold))
+most_sold$make <- factor(most_sold$make, levels = most_sold$make)
+```
+
+-   Highlighted the top five most sold makes for data visualization.
+
+```{r highlighting top 5 makes}
+most_sold$highlight <- "No"
+idx <- order(most_sold$total_sold, decreasing=TRUE)[1:5] #indexing top 5
+most_sold$highlight[idx] <- "Yes"
+tibble(most_sold)
+```
+
+-   Created a new data frame for only the top five makes.
+
+```{r subsetting top 5 makes}
+top_5 <- cars_df %>%
+  filter(make %in% head(most_sold$make, 5)) %>%
+  mutate(make = factor(make, levels = c("Ford", "Nissan", "Chevrolet", "BMW", "Toyota"))) %>%
+  arrange(make)#ordering by rank
+top_5$body <- tolower(top_5$body) # making format consistent
+top_5$body <- str_replace(top_5$body, "regular-cab", "regular cab") # making format consistent
+tibble(top_5)
+```
+
+-   To simplify the analysis process I grouped each body to four categories: Cars, SUVs, Trucks, and Vans.
+
+```{r checking unique body styles of makes, echo}
+tibble(unique(top_5$body))
+```
+
+-   Since there were 19 unique body types for vehicles I utilized AI assistance to make the process more efficient, mapping each body type to the four categories and making a new column that classifies each vehicle.
+
+```{r used AI to help categorize body into smaller groups}
+type_mapping <- c(
+  "sedan" = "Car",
+  "suv" = "SUV",
+  "hatchback" = "Car",
+  "supercrew" = "Truck",
+  "supercab" = "Truck",
+  "van" = "Van",
+  "double cab" = "Truck",
+  "convertible" = "Car",
+  "extended cab" = "Truck",
+  "coupe" = "Car",
+  "minivan" = "Van",
+  "access cab" = "Truck",
+  "crew cab" = "Truck",
+  "e-series van" = "Van",
+  "wagon" = "Car",
+  "regular cab" = "Truck",
+  "crewmax cab" = "Truck",
+  "king cab" = "Truck",
+  "xtracab" = "Truck"
+)
+top_5$vehicle_type <- type_mapping[top_5$body]
+tibble(top_5)
+```
+
+### Comparative analysis: Ford vs. Nissan
+
+-   After grouping each body type I began comparative analysis between Ford and Nissan the top two most sold manufacturer makes.
+
+```{r filtering for ford/nissan cars}
+ford_car <- top_5 %>%
+  filter(make == "Ford" & vehicle_type == "Car") %>%
+  group_by(model) %>%
+  summarize(total_sold = n(),
+    total_sales = sum(sellingprice)) %>%
+  arrange(desc(total_sold))
+
+nissan_car <- top_5 %>%
+  filter(make == "Nissan" & vehicle_type == "Car") %>%
+  group_by(model) %>%
+  summarize(
+    total_sold = n(),
+    total_sales = sum(sellingprice)) %>%
+  arrange(desc(total_sold))
+```
+
+-   After creating pivot data frames summarizing Ford and Nissan cars, I highlighted them.
+
+```{r highlighting ford/nissan cars}
+ford_car$model <- factor(ford_car$model, levels = ford_car$model)
+nissan_car$model <- factor(nissan_car$model, levels = nissan_car$model)
+
+ford_car$highlight <- "No"
+idx <- order(ford_car$total_sold, decreasing=TRUE)[1:3]
+ford_car$highlight[idx] <- "Yes"
+
+nissan_car$highlight <- "No"
+idx <- order(nissan_car$total_sold, decreasing=TRUE)[1:3]
+nissan_car$highlight[idx] <- "Yes"
+
+tibble(ford_car)
+tibble(nissan_car)
+```
+
+**I then did the same thing for SUVs, Trucks, and Vans.**
+
+-   SUVs
+
+```{r filtering for ford/nissan SUV, results='hide'}
+ford_suv <- top_5 %>%
+  filter(make == "Ford" & vehicle_type == "SUV") %>%
+  group_by(model) %>%
+  summarize(
+    total_sold = n(),
+    total_sales = sum(sellingprice)) %>%
+  arrange(desc(total_sold))
+
+nissan_suv <- top_5 %>%
+  filter(make == "Nissan" & vehicle_type == "SUV") %>%
+  group_by(model) %>%
+  summarize(
+    total_sold = n(),
+    total_sales = sum(sellingprice)) %>%
+  arrange(desc(total_sold))
+```
+
+```{r highlighting ford/nissan SUV}
+ford_suv$model <- factor(ford_suv$model, levels = ford_suv$model)
+nissan_suv$model <- factor(nissan_suv$model, levels = nissan_suv$model)
+
+ford_suv$highlight <- "No"
+idx <- order(ford_suv$total_sold, decreasing=TRUE)[1:3]
+ford_suv$highlight[idx] <- "Yes"
+
+nissan_suv$highlight <- "No"
+idx <- order(nissan_suv$total_sold, decreasing=TRUE)[1:3]
+nissan_suv$highlight[idx] <- "Yes"
+```
+
+-   Trucks
+
+```{r filtering for ford/nissan truck}
+ford_truck <- top_5 %>%
+  filter(make == "Ford" & vehicle_type == "Truck") %>%
+  group_by(model) %>%
+  summarize(
+    total_sold = n(),
+    total_sales = sum(sellingprice)) %>%
+  arrange(desc(total_sold))
+
+nissan_truck <- top_5 %>%
+  filter(make == "Nissan" & vehicle_type == "Truck") %>%
+  group_by(model) %>%
+  summarize(
+    total_sold = n(),
+    total_sales = sum(sellingprice)) %>%
+  arrange(desc(total_sold))
+```
+
+```{r highlighting ford/nissan truck}
+ford_truck$model <- factor(ford_truck$model, levels = ford_truck$model)
+nissan_truck$model <- factor(nissan_truck$model, levels = nissan_truck$model)
+
+ford_truck$highlight <- "No"
+idx <- order(ford_truck$total_sold, decreasing=TRUE)[1:3]
+ford_truck$highlight[idx] <- "Yes"
+
+nissan_truck$highlight <- "No"
+idx <- order(nissan_truck$total_sold, decreasing=TRUE)[1:3]
+nissan_truck$highlight[idx] <- "Yes"
+```
+
+-   Vans
+
+```{r filtering ford/nissan van}
+ford_van <- top_5 %>%
+  filter(make == "Ford" & vehicle_type == "Van") %>%
+  group_by(model) %>%
+  summarize(
+    total_sold = n(),
+    total_sales = sum(sellingprice)) %>%
+  arrange(desc(total_sold))
+
+nissan_van <- top_5 %>%
+  filter(make == "Nissan" & vehicle_type == "Van") %>%
+  group_by(model) %>%
+  summarize(
+    total_sold = n(),
+    total_sales = sum(sellingprice)) %>%
+  arrange(desc(total_sold))
+```
+
+```{r highlighting ford/nissan van}
+ford_van$model <- factor(ford_van$model, levels = ford_van$model)
+nissan_van$model <- factor(nissan_van$model, levels = nissan_van$model)
+
+ford_van$highlight <- "No"
+idx <- order(ford_van$total_sold, decreasing=TRUE)[1:3]
+ford_van$highlight[idx] <- "Yes"
+
+nissan_van$highlight <- "No"
+idx <- order(nissan_van$total_sold, decreasing=TRUE)[1:3]
+nissan_van$highlight[idx] <- "Yes"
+```
+
+-   All the important aggregated data is now compiled and ready for data visualization.
+
+## Visualization
+
+### Aggregate data of top five vehicle makes
+
+```{r visualizing top 5 makes, echo=FALSE}
+ggplot(data = head(most_sold, 20)) +
+  geom_bar(mapping = aes(x = make, y = total_sold, fill = highlight), stat = "identity") +
+  labs(title = "Top 20 Most Sold Makes 2014-2015",
+       x = "Make",
+       y = "Total Sold",
+       fill = "Top 5") +
+  scale_fill_manual(values = c("gray80", "skyblue")) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(data = head(most_sold, 20)) +
+  geom_bar(mapping = aes(x = make, y = total_sales, fill = highlight), stat = "identity") +
+  scale_y_continuous(labels = scales::label_number(scale = 1e-6, suffix = "M")) +
+  labs(title = "Top 20 Total Vehicle Sales 2014-2015",
+       x = "Make",
+       y = "Total Sales ($)",
+       fill = "Top 5") +
+  scale_fill_manual(values = c("gray80", "skyblue")) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(data = head(most_sold, 20)) +
+  geom_bar(mapping = aes(x = make, y = avg_sell_price, fill = highlight), stat = "identity") +
+  labs(title = "Top 20 Average Vehicle Sell Price 2014-2015",
+       x = "Make",
+       y = "Average Price ($)",
+       fill = "Top 5") +
+  scale_fill_manual(values = c("gray80", "skyblue")) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### Top five makes by vehicle types
+
+```{r visualizing top 5 car makes seperating vehicle types, echo=FALSE}
+ggplot(data = top_5) +
+  geom_bar(mapping = aes(x = make, fill = vehicle_type), stat = "count", position = position_dodge()) +
+  labs(title = "Top 5 Most Sold Makes 2014-2015",
+       x = "Vehicle Make",
+       y = "Total Sold",
+       fill = "Type") +
+  scale_fill_brewer(palette = "Paired") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### Top three Ford & Nissan cars
+
+```{r visualizing highlighted ford/nissan cars, echo=FALSE}
+ggplot(data = ford_car) + 
+  geom_bar(mapping = aes(x=model, y=total_sold, fill = highlight), stat = "identity") +
+  labs(title = "Top 3 Ford Car Model 2014-2015",
+    x = "Car model",
+    y = "Total Sold",
+    fill = "Top 3") +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(values = c("gray80", "skyblue")) 
+
+ggplot(data = nissan_car) + 
+  geom_bar(mapping = aes(x=model, y=total_sold,, fill = highlight), stat = "identity") +
+  labs(title = "Top 3 Nissan Car Model 2014-2015",
+    x = "Car model",
+    y = "Total Sold",
+    fill = "Top 3") +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(values = c("gray80", "skyblue")) 
+```
+
+### Top three Ford & Nissan SUVs
+
+```{r visualizing highlighted ford/nissan SUV, echo=FALSE}
+ggplot(data = ford_suv) + 
+  geom_bar(mapping = aes(x=model, y=total_sold, fill = highlight), stat = "identity") +
+  labs(title = "Top 3 Ford SUV Model 2014-2015",
+    x = "SUV model",
+    y = "Total Sold",
+    fill = "Top 3") +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(values = c("gray80", "skyblue"))
+
+ggplot(data = nissan_suv) + 
+  geom_bar(mapping = aes(x=model, y=total_sold, fill = highlight), stat = "identity") +
+  labs(title = "Top 3 Nissan SUV Model 2014-2015",
+    x = "SUV model",
+    y = "Total Sold",
+    fill = "Top 3") +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(values = c("gray80", "skyblue"))
+```
+
+### Top three Ford & Nissan trucks
+
+```{r visualizing ford/nissan truck, echo=FALSE}
+ggplot(data = ford_truck) + 
+  geom_bar(mapping = aes(x=model, y=total_sold, fill = highlight), stat = "identity") +
+  labs(title = "Top 3 Ford Truck Model 2014-2015",
+    x = "Truck model",
+    y = "Total Sold",
+    fill = "Top 3") +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(values = c("gray80", "skyblue"))
+
+ggplot(data = nissan_truck) + 
+  geom_bar(mapping = aes(x=model, y=total_sold), stat = "identity", fill = "skyblue") +
+  labs(title = "Top 3 Nissan Truck Model 2014-2015",
+    x = "Truck model",
+    y = "Total Sold") +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### Top three Ford & Nissan vans
+
+```{r visualizing ford/nissan van, echo=FALSE}
+ggplot(data = ford_van) + 
+  geom_bar(mapping = aes(x=model, y=total_sold, fill = highlight), stat = "identity") +
+  labs(title = "Top 3 Ford Van Model 2014-2015",
+    x = "Van model",
+    y = "Total Sold",
+    fill = "Top 3") +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(values = c("gray80", "skyblue"))
+
+ggplot(data = nissan_van) + 
+  geom_bar(mapping = aes(x=model, y=total_sold, fill = highlight), stat = "identity") +
+  labs(title = "Top 3 Nissan Van Model 2014-2015",
+    x = "Van model",
+    y = "Total Sold",
+    fill = "Top 3") +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(values = c("gray80", "skyblue"))
+```
+
+## Insights from analysis
+
+Keeping the stakeholder in mind first, the goal of this analysis is to examine car sales data to uncover market characteristics and trends. By pinpointing the most popular vehicle makes, types, and models, we aim to create targeted marketing strategies and guide future vehicle development.
+
+### Top selling vehicle makes
+
+-   Ford, Nissan, Chevrolet, BMW, and Toyota are the top five most sold makes, with Ford leading the sales.
+
+-   These brands have a lead over others, indicating their strong market presence and consumer preference in California.
+
+### Highest vehicle sales
+
+-   The total sales revenue also aligns with the most sold makes, with BMW generating the highest total sales revenue, followed by Ford and Nissan.
+
+-   This suggests that BMW, while not the top in units sold, has higher-priced vehicles contributing to the higher total sales revenue.
+
+### Average vehicle sale price
+
+-   The average sell price of vehicles shows that BMW and Mercedes-Benz have higher average prices compared to other brands.
+
+-   Although, the Mercedes-Benz brand is not within the top five for most vehicle sales, the average selling price of a Mercedes-Benz vehicle can be associated with the premium market.
+
+### Top five vehicle makes by vehicle type
+
+-   Cars are the most popular vehicle type, especially for Nissan and BMW.
+
+-   SUVs also show significant sales, particularly for Ford and Chevrolet, indicating a strong consumer interest in these vehicle types.
+
+-   Truck sales while not as much as SUVs make a strong presence in sales, especially for Ford and Chevrolet.
+
+-   Sales in vans are consistently on the lower end of the three, indicating a smaller consumer interest in these vehicle types.
+
+### Top Ford Models
+
+-   The top three Ford car models are Fusion, Focus, and Mustang.
+
+-   For SUVs the top three are Escape, Edge, and Explorer.
+
+-   For Trucks the F-150, F250 Super Duty, and Ranger are most popular.
+
+-   The top three Ford vans models are the E-Series Van, Transit Connect, and E-Series Wagon.
+
+### Top Nissan Models
+
+-   The top three Nissan car models are the Altima, Sentra, and Versa.
+
+-   For SUVs the top three are Rogue, Murano, and Pathfinder.
+
+-   For Trucks the Frontier and Titan are most popular.
+
+-   The top three Nissan vans models are the Quest, NV Cargo, and NV.
+
+## Summary of findings
+
+Given the hypothetical stakeholder case, it is 2016 and I am an analyst for a car dealership company in California.
+
+In this report we analyzed vehicle sales from 2014-2015 to identify market trends and top performing vehicle characteristics. Our key findings:
+
+-   Top selling makes: Ford, Nissan, Chevrolet, BMW, and Toyota performed the best in units sold.
+
+-   Revenue insights: BMW generated the highest total sales revenue within the top five, indicating a premium pricing strategy
+
+-   Vehicle types: Cars and SUVs performed the best among the top five makes.
+
+-   Model Popularity: Specific models such as Ford Fusion and Nissan Altima were identified as top sellers in their respective categories.
+
+## Implications
+
+Customer preference is foundation for our marketing and sales strategies. Focus on consumer preferences for certain makes, models, and vehicle types allow us to tailor our inventor and marketing efforts more effectively.
+
+## Recommended strategies
+
+### 1. Focusing on popular makes and models.
+
+-   Promoting Ford's Fusion, Escape, and F-150 or Nissan's Altima, Rouge, and Frontier.
+
+-   Promoting Nissan's and BMW's cars.
+
+-   Promoting Ford's and Chevrolet's SUV and Trucks.
+
+### 2. Target SUV and car segments
+
+-   Since cars and SUVs are the most popular vehicle types, emphasize brands like Nissan and Toyota.
+
+### 3. Leverage less popular vehicle makes and models to be replaced by the popular ones.
+
+-   For Cars promote Ford's Taurus, Fiesta, and Flex or Nissan's Leaf, Maxima, and Versa Note.
+
+-   For SUVs promote Ford's Expedition, Excursion, and Escape Hybrid or Nissan's Xterra, Amada, and Rogue Select.
+
+## Limitations/bias of the data
+
+Following ROCCC (Reliable, Original, Comprehensive, Current, Cited) procedures:
+
+Going through each component of ROCCC:
+
+-   Reliable: This dataset is provided by a user of Kaggle, its reliability is questionable.
+-   Original: The provenance stated by the provider of this data was found "online on the internet", where it was "downloaded from the internet".
+-   Comprehensive: The data is comprehensive, containing all critical information needed for the analysis.
+-   Current: This dataset provide sales record from 2014-2015 so it is not current.
+-   Cited: This dataset does not cite the original source of the data.
+
+Considering the fact that this dataset does not comply with ROCCC, this data should not be used for analysis in a real-world case involving stakeholders. However, because this data is comprehensive, moving forward I will be making a the setting of this analysis is **hypothetical** taking place as if the data complied with ROCCC where I am an analyst in 2016 given a task by stakeholders at that time.
+
+## Future work
+
+Continued analyses could benefit from additional sales records to focus on current sales trends. Additionally, exploring other factors such as regional variations and competitive analysis could enhance the understanding of the market.
+
+## Closing Statement
+
+This vehicle sales analysis has provided critical insights into vehicle sales trends and consumer preferences, promoting our marketing and inventory strategies. By leveraging these insights, we can better meet the needs of out customer enhancing our competitive position.
+
+Thank you to everyone I look forward to implementing these findings to drive our business forward.
