@@ -20,6 +20,20 @@ This report provides an in-depth analysis of vehicle sales data for a California
 
 The objective of this analysis is to explore vehicle sales data to understand the characteristics and trends of the market. By identifying the most popular vehicle makes, types, and models, we aim to develop targeted marketing strategies and inform future vehicle inventory.
 
+## Limitations/bias of the data
+
+Following ROCCC (Reliable, Original, Comprehensive, Current, Cited) procedures:
+
+Going through each component of ROCCC:
+
+-   Reliable: This dataset is provided by a user of Kaggle, its reliability is questionable.
+-   Original: The provenance stated by the provider of this data was found "online on the internet", where it was "downloaded from the internet".
+-   Comprehensive: The data is comprehensive, containing all critical information needed for the analysis.
+-   Current: This dataset provide sales record from 2014-2015 so it is not current.
+-   Cited: This dataset does not cite the original source of the data.
+
+Considering the fact that this dataset does not comply with ROCCC, this data should not be used for analysis in a real-world case involving stakeholders. However, because this data is comprehensive, moving forward I will be making a the setting of this analysis is **hypothetical** taking place as if the data complied with ROCCC where I am an analyst in 2016 given a task by stakeholders at that time.
+
 ## Data Description
 
 The source of this [dataset](https://www.kaggle.com/datasets/syedanwarafridi/vehicle-sales-data/data) was accessed from a public third-party source from Kaggle by a user, Syed Anwar. This dataset includes 558,837 records that have 16 variables, or 558,837 rows and 16 columns.
@@ -663,20 +677,6 @@ Customer preference is foundation for our marketing and sales strategies. Focus 
 -   For Cars promote Ford's Taurus, Fiesta, and Flex or Nissan's Leaf, Maxima, and Versa Note.
 
 -   For SUVs promote Ford's Expedition, Excursion, and Escape Hybrid or Nissan's Xterra, Amada, and Rogue Select.
-
-## Limitations/bias of the data
-
-Following ROCCC (Reliable, Original, Comprehensive, Current, Cited) procedures:
-
-Going through each component of ROCCC:
-
--   Reliable: This dataset is provided by a user of Kaggle, its reliability is questionable.
--   Original: The provenance stated by the provider of this data was found "online on the internet", where it was "downloaded from the internet".
--   Comprehensive: The data is comprehensive, containing all critical information needed for the analysis.
--   Current: This dataset provide sales record from 2014-2015 so it is not current.
--   Cited: This dataset does not cite the original source of the data.
-
-Considering the fact that this dataset does not comply with ROCCC, this data should not be used for analysis in a real-world case involving stakeholders. However, because this data is comprehensive, moving forward I will be making a the setting of this analysis is **hypothetical** taking place as if the data complied with ROCCC where I am an analyst in 2016 given a task by stakeholders at that time.
 
 ## Future work
 
