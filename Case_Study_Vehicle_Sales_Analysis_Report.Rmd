@@ -1,7 +1,7 @@
 ---
 title: "Case study: Vehicle Sales Analysis Report"
 author: "Anthony Lu"
-date: "7/5/24"
+date: "2024"
 output:
   html_document:
     css: styles.css
@@ -19,6 +19,41 @@ knitr::opts_chunk$set(echo = TRUE)
 This report provides an in-depth analysis of vehicle sales data for a California car dealership company. The primary objectives are to identify top-performing vehicle makes, types, and models, and to extract insights that can inform and enhance future vehicle inventory and marketing strategies.
 
 The objective of this analysis is to explore vehicle sales data to understand the characteristics and trends of the market. By identifying the most popular vehicle makes, types, and models, we aim to develop targeted marketing strategies and inform future vehicle inventory.
+
+## Recommended strategies
+
+### 1. Focusing on popular makes and models.
+
+-   Promoting Ford's Fusion, Escape, and F-150 or Nissan's Altima, Rouge, and Frontier.
+
+-   Promoting Nissan's and BMW's cars.
+
+-   Promoting Ford's and Chevrolet's SUV and Trucks.
+
+### 2. Target SUV and car segments
+
+-   Since cars and SUVs are the most popular vehicle types, emphasize brands like Nissan and Toyota.
+
+### 3. Leverage less popular vehicle makes and models to be replaced by the popular ones.
+
+-   For Cars promote Ford's Taurus, Fiesta, and Flex or Nissan's Leaf, Maxima, and Versa Note.
+
+-   For SUVs promote Ford's Expedition, Excursion, and Escape Hybrid or Nissan's Xterra, Amada, and Rogue Select.
+
+## Visualizations
+
+![](D:/R/top_20.png) 
+![](D:/R/top_20_sales.png)
+![](D:/R/top_20_avg.png) 
+![](D:/R/top_5_makes.png) 
+![](D:/R/ford_car.png)
+![](D:/R/nissan_car.png) 
+![](D:/R/ford_suv.png)
+![](D:/R/nissan_suv.png)
+![](D:/R/ford_truck.png)
+![](D:/R/nissan_truck.png) 
+![](D:/R/ford_van.png)
+![](D:/R/nissan_van.png) 
 
 ## Limitations/bias of the data
 
@@ -225,7 +260,7 @@ library(tidyverse)
 -   Viewed the dataset, there are 70,206 rows and 24 columns.
 
 ```{r look at data}
-cars_df <- read.csv("car_sales_cleaned.csv")
+cars_df <- read.csv("D:/R/car_sales_cleaned.csv")
 tibble(cars_df)
 ```
 
@@ -447,11 +482,11 @@ nissan_van$highlight[idx] <- "Yes"
 
 -   All the important aggregated data is now compiled and ready for data visualization.
 
-## Visualization
+## Visualization Code
 
 ### Aggregate data of top five vehicle makes
 
-```{r visualizing top 5 makes, echo=FALSE}
+```{r visualizing top 5 makes, results='hide'}
 ggplot(data = head(most_sold, 20)) +
   geom_bar(mapping = aes(x = make, y = total_sold, fill = highlight), stat = "identity") +
   labs(title = "Top 20 Most Sold Makes 2014-2015",
@@ -483,7 +518,7 @@ ggplot(data = head(most_sold, 20)) +
 
 ### Top five makes by vehicle types
 
-```{r visualizing top 5 car makes seperating vehicle types, echo=FALSE}
+```{r visualizing top 5 car makes seperating vehicle types, results='hide'}
 ggplot(data = top_5) +
   geom_bar(mapping = aes(x = make, fill = vehicle_type), stat = "count", position = position_dodge()) +
   labs(title = "Top 5 Most Sold Makes 2014-2015",
@@ -496,7 +531,7 @@ ggplot(data = top_5) +
 
 ### Top three Ford & Nissan cars
 
-```{r visualizing highlighted ford/nissan cars, echo=FALSE}
+```{r visualizing highlighted ford/nissan cars, results='hide'}
 ggplot(data = ford_car) + 
   geom_bar(mapping = aes(x=model, y=total_sold, fill = highlight), stat = "identity") +
   labs(title = "Top 3 Ford Car Model 2014-2015",
@@ -520,7 +555,7 @@ ggplot(data = nissan_car) +
 
 ### Top three Ford & Nissan SUVs
 
-```{r visualizing highlighted ford/nissan SUV, echo=FALSE}
+```{r visualizing highlighted ford/nissan SUV, results='hide'}
 ggplot(data = ford_suv) + 
   geom_bar(mapping = aes(x=model, y=total_sold, fill = highlight), stat = "identity") +
   labs(title = "Top 3 Ford SUV Model 2014-2015",
@@ -544,7 +579,7 @@ ggplot(data = nissan_suv) +
 
 ### Top three Ford & Nissan trucks
 
-```{r visualizing ford/nissan truck, echo=FALSE}
+```{r visualizing ford/nissan truck, results='hide'}
 ggplot(data = ford_truck) + 
   geom_bar(mapping = aes(x=model, y=total_sold, fill = highlight), stat = "identity") +
   labs(title = "Top 3 Ford Truck Model 2014-2015",
@@ -566,7 +601,7 @@ ggplot(data = nissan_truck) +
 
 ### Top three Ford & Nissan vans
 
-```{r visualizing ford/nissan van, echo=FALSE}
+```{r visualizing ford/nissan van, results='hide'}
 ggplot(data = ford_van) + 
   geom_bar(mapping = aes(x=model, y=total_sold, fill = highlight), stat = "identity") +
   labs(title = "Top 3 Ford Van Model 2014-2015",
@@ -587,6 +622,7 @@ ggplot(data = nissan_van) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   scale_fill_manual(values = c("gray80", "skyblue"))
 ```
+
 
 ## Insights from analysis
 
@@ -657,26 +693,6 @@ In this report we analyzed vehicle sales from 2014-2015 to identify market trend
 ## Implications
 
 Customer preference is foundation for our marketing and sales strategies. Focus on consumer preferences for certain makes, models, and vehicle types allow us to tailor our inventor and marketing efforts more effectively.
-
-## Recommended strategies
-
-### 1. Focusing on popular makes and models.
-
--   Promoting Ford's Fusion, Escape, and F-150 or Nissan's Altima, Rouge, and Frontier.
-
--   Promoting Nissan's and BMW's cars.
-
--   Promoting Ford's and Chevrolet's SUV and Trucks.
-
-### 2. Target SUV and car segments
-
--   Since cars and SUVs are the most popular vehicle types, emphasize brands like Nissan and Toyota.
-
-### 3. Leverage less popular vehicle makes and models to be replaced by the popular ones.
-
--   For Cars promote Ford's Taurus, Fiesta, and Flex or Nissan's Leaf, Maxima, and Versa Note.
-
--   For SUVs promote Ford's Expedition, Excursion, and Escape Hybrid or Nissan's Xterra, Amada, and Rogue Select.
 
 ## Future work
 
