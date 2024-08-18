@@ -4,7 +4,7 @@ Hello, I'm Anthony. I like frogs, this is my portfolio.
 
 ### Presentations/Reports
 
-[Time Series Sales Forecast](https://anlu5.github.io/Portfolio/Driving%20Sales%20and%20Efficiency.pdf) | Python, PowerPoint, Excel
+[Enhancing Grocery Store Operations](https://anlu5.github.io/Portfolio/Driving%20Sales%20and%20Efficiency.pdf) | Python, PowerPoint, Excel
 
 [Vehicle Sales Analysis](https://anlu5.github.io/Portfolio/Case_Study_Vehicle_Sales_Analysis_Report.html) | PostgreSQL, R, RMD
 
